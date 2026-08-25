@@ -2,7 +2,7 @@
 
 A remote MCP server exposing a handful of name.ai's public, no-auth-required
 APIs as tools: domain search/availability, WHOIS lookup, TLD registration
-pricing, TLD requirements, and marketplace browsing. See
+pricing, and TLD requirements. See
 [src/nameai_mcp/server.py](src/nameai_mcp/server.py) for the tool definitions
 and [src/nameai_mcp/nameai_client.py](src/nameai_mcp/nameai_client.py) for the
 HTTP client that talks to name.ai.

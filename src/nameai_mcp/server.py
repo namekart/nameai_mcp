@@ -105,34 +105,3 @@ async def tld_requirements(tld: str) -> dict:
         if err.status_code == 404:
             return {"tld": tld, "found": False, "message": str(err)}
         raise
-
-
-@mcp.tool()
-async def browse_marketplace(
-    query: str | None = None,
-    max_price_usd: float | None = None,
-    sort: Literal["newest", "price_asc", "price_desc"] = "newest",
-    limit: int = 24,
-) -> dict:
-    """Browse .ai domains currently listed for sale on the name.ai
-    marketplace.
-
-    Backed by GET /api/market/listings — public, no auth required. Listing
-    buy-now/floor prices are hidden for every MCP caller (same
-    sign-in-required, email-verified price gate as search_domain); a listing
-    with a hidden price still means "for sale," just without a number
-    attached.
-
-    Args:
-        query: Optional substring to filter the domain name by.
-        max_price_usd: Optional upper bound on the buy-now price, in USD.
-        sort: "newest" (default), "price_asc", or "price_desc".
-        limit: Max listings to return (1-200, default 24).
-    """
-    params: dict[str, object] = {"limit": max(1, min(limit, 200)), "sort": sort}
-    if query:
-        params["q"] = query
-    if max_price_usd is not None:
-        params["max"] = round(max_price_usd * 100)
-    data = await get_json("/api/market/listings", params)
-    return {"items": data.get("items", []), "page": data.get("page")}
