@@ -1,12 +1,13 @@
-"""Thin async client for the public, no-auth-required name.ai JSON API.
+"""Thin async client for the public name.ai JSON API.
 
-Every endpoint called here is reachable without a session cookie today (see
-route source for each — linked in docstrings on the call sites in server.py).
-Two of them apply name.ai's price-visibility policy server-side: an
-unauthenticated caller (which every MCP request is, since we never forward a
-session) gets aftermarket/marketplace prices masked to null and only sees
+Every endpoint called here works without authentication (see route source for
+each — linked in docstrings on the call sites in server.py). Two of them
+apply name.ai's price-visibility policy server-side: an unauthenticated
+caller gets aftermarket/marketplace prices masked to null and only sees
 new-registration TLD pricing. That's intentional upstream behavior, not a bug
-here — see lib/server/price-visibility.js in the main app.
+here — see lib/server/price-visibility.js in the main app. search_domain
+forwards a valid OAuth Bearer token when the caller has one (see
+oauth_verifier.py), which lifts that mask — see AUTH.md on name.ai.
 """
 
 from __future__ import annotations
@@ -43,26 +44,36 @@ def _error_message(status_code: int, body: bytes) -> str:
     return f"name.ai API returned HTTP {status_code}"
 
 
-async def get_json(path: str, params: dict[str, Any] | None = None) -> Any:
-    async with httpx.AsyncClient(base_url=API_BASE_URL, timeout=_TIMEOUT, headers=_HEADERS) as client:
+async def get_json(path: str, params: dict[str, Any] | None = None, extra_headers: dict[str, str] | None = None) -> Any:
+    headers = {**_HEADERS, **extra_headers} if extra_headers else _HEADERS
+    async with httpx.AsyncClient(base_url=API_BASE_URL, timeout=_TIMEOUT, headers=headers) as client:
         resp = await client.get(path, params=params)
     if resp.is_error:
         raise NameAIAPIError(resp.status_code, _error_message(resp.status_code, resp.content))
     return resp.json()
 
 
-async def post_json(path: str, json_body: dict[str, Any], timeout: httpx.Timeout | None = None) -> Any:
-    async with httpx.AsyncClient(base_url=API_BASE_URL, timeout=timeout or _TIMEOUT, headers=_HEADERS) as client:
+async def post_json(
+    path: str,
+    json_body: dict[str, Any],
+    timeout: httpx.Timeout | None = None,
+    extra_headers: dict[str, str] | None = None,
+) -> Any:
+    headers = {**_HEADERS, **extra_headers} if extra_headers else _HEADERS
+    async with httpx.AsyncClient(base_url=API_BASE_URL, timeout=timeout or _TIMEOUT, headers=headers) as client:
         resp = await client.post(path, json=json_body)
     if resp.is_error:
         raise NameAIAPIError(resp.status_code, _error_message(resp.status_code, resp.content))
     return resp.json()
 
 
-async def post_ndjson_rows(path: str, json_body: dict[str, Any]) -> list[dict[str, Any]]:
+async def post_ndjson_rows(
+    path: str, json_body: dict[str, Any], extra_headers: dict[str, str] | None = None
+) -> list[dict[str, Any]]:
     """POST to an NDJSON-streaming endpoint and collect every `row` event."""
+    headers = {**_HEADERS, **extra_headers} if extra_headers else _HEADERS
     rows: list[dict[str, Any]] = []
-    async with httpx.AsyncClient(base_url=API_BASE_URL, timeout=_TIMEOUT, headers=_HEADERS) as client:
+    async with httpx.AsyncClient(base_url=API_BASE_URL, timeout=_TIMEOUT, headers=headers) as client:
         async with client.stream("POST", path, json=json_body) as resp:
             if resp.is_error:
                 body = await resp.aread()

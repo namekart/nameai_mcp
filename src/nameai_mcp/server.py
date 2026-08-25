@@ -3,10 +3,20 @@ from __future__ import annotations
 from typing import Literal
 
 import httpx
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 
 from nameai_mcp.nameai_client import NameAIAPIError, get_json, post_json, post_ndjson_rows
+from nameai_mcp.oauth_verifier import verify_bearer_token
 
+# Deliberately NOT passing auth=AuthSettings(...) here. The lowlevel Server's
+# streamable_http_app() would happily publish RFC 9728 discovery metadata
+# from `auth` alone — but MCPServer.__init__ itself raises unless `auth` is
+# paired with token_verifier or auth_server_provider, and setting
+# token_verifier activates RequireAuthMiddleware on the entire /mcp route
+# (confirmed by reading mcp/server/lowlevel/server.py), which would require a
+# valid bearer token for the 3 public tools too. Not achievable through this
+# SDK class without breaking that contract. OAuth discoverability instead
+# comes from .well-known/mcp.json's custom "auth" field and AUTH.md.
 mcp = MCPServer(name="nameai-mcp")
 
 # RDAP can retry against multiple registries before falling back to DomainIQ
@@ -15,24 +25,32 @@ _WHOIS_TIMEOUT = httpx.Timeout(connect=10.0, read=45.0, write=10.0, pool=10.0)
 
 
 @mcp.tool()
-async def search_domain(domain: str, include_alternates: bool = True) -> dict:
+async def search_domain(domain: str, include_alternates: bool = True, ctx: Context = None) -> dict:
     """Check whether a domain is available and, for the same label, whether its
     common alternate TLDs are too (e.g. querying "acme.com" also returns
     "acme.ai", "acme.io", ...).
 
     Backed by POST /api/domain/search — public, no auth required.
 
-    Buy-now (aftermarket/marketplace) prices are hidden for every MCP caller,
-    since these calls are always unauthenticated and name.ai only reveals
-    that price to signed-in, email-verified users. New-registration pricing
-    (a domain that is simply unregistered) is still included.
+    Buy-now (aftermarket/marketplace) prices are hidden unless you're
+    authenticated (see AUTH.md at name.ai for how to get a token) — an
+    unauthenticated call only sees new-registration pricing for a domain
+    that's simply unregistered. Pass a valid OAuth access token as this
+    call's Authorization header and it's forwarded automatically.
 
     Args:
         domain: A domain name to check, e.g. "example.ai".
         include_alternates: When true (default), also return sibling TLDs for
             the same label. When false, only the exact domain is returned.
     """
-    rows = await post_ndjson_rows("/api/domain/search", {"q": domain})
+    extra_headers = None
+    auth_header = (ctx.headers or {}).get("authorization") if ctx else None
+    if auth_header and auth_header.lower().startswith("bearer "):
+        token = auth_header[len("bearer ") :].strip()
+        if await verify_bearer_token(token):
+            extra_headers = {"authorization": auth_header}
+
+    rows = await post_ndjson_rows("/api/domain/search", {"q": domain}, extra_headers=extra_headers)
     if not include_alternates and rows:
         primary = rows[0]["domain"]
         rows = [r for r in rows if r["domain"] == primary]
