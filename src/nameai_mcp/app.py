@@ -33,6 +33,27 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# RFC 9728 Protected Resource Metadata — a plain static document, published
+# by hand rather than via the SDK's own auto-generated route. The SDK only
+# generates this when MCPServer(auth=..., token_verifier=...) is set, and
+# token_verifier wraps the entire /mcp endpoint in RequireAuthMiddleware,
+# requiring a token for the 3 public tools too — not something we want (see
+# server.py). Publishing this document doesn't require any enforcement
+# logic, so it's safe to hand-write independent of that constraint.
+_NAMEAI_API_BASE_URL = os.environ.get("NAMEAI_API_BASE_URL", "https://name.ai")
+_MCP_PUBLIC_URL = os.environ.get("MCP_PUBLIC_URL", "https://nameai-mcp.h.namekart.com")
+
+
+@app.get("/.well-known/oauth-protected-resource")
+def oauth_protected_resource() -> dict:
+    return {
+        "resource": _MCP_PUBLIC_URL,
+        "authorization_servers": [_NAMEAI_API_BASE_URL],
+        "scopes_supported": ["pricing:read"],
+        "bearer_methods_supported": ["header"],
+    }
+
+
 # streamable_http_app() registers its own endpoint internally at "/mcp", so
 # mounting it here at root gives a clean external path (GET /health, POST/GET
 # /mcp) instead of a doubled-up "/mcp-server/mcp". /health above is registered
