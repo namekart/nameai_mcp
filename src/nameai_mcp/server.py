@@ -1,0 +1,138 @@
+from __future__ import annotations
+
+from typing import Literal
+
+import httpx
+from mcp.server.mcpserver import MCPServer
+
+from nameai_mcp.nameai_client import NameAIAPIError, get_json, post_json, post_ndjson_rows
+
+mcp = MCPServer(name="nameai-mcp")
+
+# RDAP can retry against multiple registries before falling back to DomainIQ
+# (see app/api/tools/whois/route.js) — needs more headroom than other calls.
+_WHOIS_TIMEOUT = httpx.Timeout(connect=10.0, read=45.0, write=10.0, pool=10.0)
+
+
+@mcp.tool()
+async def search_domain(domain: str, include_alternates: bool = True) -> dict:
+    """Check whether a domain is available and, for the same label, whether its
+    common alternate TLDs are too (e.g. querying "acme.com" also returns
+    "acme.ai", "acme.io", ...).
+
+    Backed by POST /api/domain/search — public, no auth required.
+
+    Buy-now (aftermarket/marketplace) prices are hidden for every MCP caller,
+    since these calls are always unauthenticated and name.ai only reveals
+    that price to signed-in, email-verified users. New-registration pricing
+    (a domain that is simply unregistered) is still included.
+
+    Args:
+        domain: A domain name to check, e.g. "example.ai".
+        include_alternates: When true (default), also return sibling TLDs for
+            the same label. When false, only the exact domain is returned.
+    """
+    rows = await post_ndjson_rows("/api/domain/search", {"q": domain})
+    if not include_alternates and rows:
+        primary = rows[0]["domain"]
+        rows = [r for r in rows if r["domain"] == primary]
+    return {"query": domain, "results": rows}
+
+
+@mcp.tool()
+async def whois_lookup(domain: str) -> dict:
+    """Look up WHOIS/RDAP registration details for a domain: registrar,
+    registrant, creation/expiration dates, nameservers.
+
+    Backed by POST /api/tools/whois — public, no auth required, but rate
+    limited by name.ai to 10 lookups per day per caller IP. Since every MCP
+    call shares this server's egress IP, that quota is pooled across all of
+    this MCP server's callers, not per end user.
+
+    Args:
+        domain: A domain name to look up, e.g. "example.com".
+    """
+    data = await post_json("/api/tools/whois", {"domain": domain}, timeout=_WHOIS_TIMEOUT)
+    lookup = data.get("lookup") or {}
+    return {
+        "domain": lookup.get("domain", domain),
+        "whois": lookup.get("result"),
+        "quota_used": data.get("used"),
+        "quota_cap": data.get("cap"),
+        "quota_remaining": data.get("remaining"),
+    }
+
+
+@mcp.tool()
+async def tld_registration_price(
+    tld: str,
+    operation: Literal["register", "transfer", "renew", "restore"] = "register",
+) -> dict:
+    """Get the current USD price for a domain-lifecycle operation on a TLD
+    (new registration, transfer-in, renewal, or restore from redemption).
+
+    Backed by GET /api/pricing/tld — public, no auth required. This is
+    name.ai's own registration pricing, not an aftermarket/marketplace price,
+    so it is never gated by sign-in status.
+
+    Args:
+        tld: The TLD without a leading dot, e.g. "ai" or "com".
+        operation: One of "register", "transfer", "renew", "restore".
+    """
+    data = await get_json("/api/pricing/tld", {"tld": tld, "op": operation})
+    price_cents = data.get("priceCents")
+    return {
+        "tld": data.get("tld", tld),
+        "operation": data.get("op", operation),
+        "price_usd": price_cents / 100 if isinstance(price_cents, (int, float)) else None,
+    }
+
+
+@mcp.tool()
+async def tld_requirements(tld: str) -> dict:
+    """Get registration requirements for a TLD: allowed registration period
+    range, whether an organization is required, allowed registrant
+    countries, nameserver rules, and similar registry policy.
+
+    Backed by GET /api/tlds/{tld}/metadata — public, no auth required.
+
+    Args:
+        tld: The TLD without a leading dot, e.g. "ai" or "io".
+    """
+    try:
+        return await get_json(f"/api/tlds/{tld}/metadata")
+    except NameAIAPIError as err:
+        if err.status_code == 404:
+            return {"tld": tld, "found": False, "message": str(err)}
+        raise
+
+
+@mcp.tool()
+async def browse_marketplace(
+    query: str | None = None,
+    max_price_usd: float | None = None,
+    sort: Literal["newest", "price_asc", "price_desc"] = "newest",
+    limit: int = 24,
+) -> dict:
+    """Browse .ai domains currently listed for sale on the name.ai
+    marketplace.
+
+    Backed by GET /api/market/listings — public, no auth required. Listing
+    buy-now/floor prices are hidden for every MCP caller (same
+    sign-in-required, email-verified price gate as search_domain); a listing
+    with a hidden price still means "for sale," just without a number
+    attached.
+
+    Args:
+        query: Optional substring to filter the domain name by.
+        max_price_usd: Optional upper bound on the buy-now price, in USD.
+        sort: "newest" (default), "price_asc", or "price_desc".
+        limit: Max listings to return (1-200, default 24).
+    """
+    params: dict[str, object] = {"limit": max(1, min(limit, 200)), "sort": sort}
+    if query:
+        params["q"] = query
+    if max_price_usd is not None:
+        params["max"] = round(max_price_usd * 100)
+    data = await get_json("/api/market/listings", params)
+    return {"items": data.get("items", []), "page": data.get("page")}
