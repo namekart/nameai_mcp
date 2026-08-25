@@ -4,5 +4,4 @@ __pycache__
 *.pyc
 .git
 .python-version
-README.md
 scripts

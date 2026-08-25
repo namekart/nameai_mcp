@@ -7,7 +7,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 # Dependencies first so this layer only rebuilds when pyproject/lock change.
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --locked --no-install-project --no-dev
 
 COPY src ./src
