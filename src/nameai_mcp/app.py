@@ -51,6 +51,36 @@ def oauth_protected_resource() -> dict:
         "authorization_servers": [_NAMEAI_API_BASE_URL],
         "scopes_supported": ["pricing:read"],
         "bearer_methods_supported": ["header"],
+        "resource_documentation": f"{_NAMEAI_API_BASE_URL}/auth.md",
+    }
+
+
+# Server card on the MCP host itself. name.ai serves the canonical copy at
+# the same path; scanners that take the MCP URL as their subject (rather than
+# the brand domain) look for it on this origin, so it's mirrored here.
+@app.get("/.well-known/mcp/server-card.json")
+def mcp_server_card() -> dict:
+    return {
+        "name": "name-ai",
+        "displayName": "Name.ai",
+        "description": (
+            "Domain search/availability, WHOIS lookup, TLD registration pricing, and TLD "
+            "registration requirements as MCP tools. All tools work without authentication; "
+            f"OAuth sign-in (see {_NAMEAI_API_BASE_URL}/auth.md) additionally unlocks real "
+            "marketplace prices on domain searches."
+        ),
+        "icon": f"{_NAMEAI_API_BASE_URL}/logo.png",
+        "iconUrl": f"{_NAMEAI_API_BASE_URL}/logo.png",
+        "url": f"{_MCP_PUBLIC_URL}/mcp",
+        "transport": "streamable-http",
+        "version": "1.0.0",
+        "publisher": {"name": "Name.ai", "url": _NAMEAI_API_BASE_URL},
+        "auth": {
+            "type": "oauth2.1",
+            "optional": True,
+            "authorization_server_metadata": f"{_NAMEAI_API_BASE_URL}/.well-known/oauth-authorization-server",
+            "docs": f"{_NAMEAI_API_BASE_URL}/auth.md",
+        },
     }
 
 
