@@ -1,0 +1,8 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "nameai",
+  "description": "Name.ai domain tools: domain search/availability, WHOIS lookup, TLD registration pricing and requirements — as an MCP server plus an agent skill.",
+  "version": "1.0.0",
+  "homepage": "https://name.ai/developers",
+  "repository": "https://github.com/namekart/nameai_mcp"
+}
