@@ -59,28 +59,46 @@ def oauth_protected_resource() -> dict:
 # the same path; scanners that take the MCP URL as their subject (rather than
 # the brand domain) look for it on this origin, so it's mirrored here.
 @app.get("/.well-known/mcp/server-card.json")
-def mcp_server_card() -> dict:
+async def mcp_server_card() -> dict:
+    # tools[] is built from the live registry so the card can never drift
+    # from what tools/list returns.
+    tools = [
+        {
+            "name": t.name,
+            "description": (t.description or "").strip().split("\n\n")[0],
+            "inputSchema": t.input_schema,
+            **({"annotations": t.annotations.model_dump(exclude_none=True)} if t.annotations else {}),
+        }
+        for t in await mcp.list_tools()
+    ]
     return {
         "name": "name-ai",
-        "displayName": "Name.ai",
+        "displayName": "Name.ai MCP Server",
         "description": (
             "Domain search/availability, WHOIS lookup, TLD registration pricing, and TLD "
             "registration requirements as MCP tools. All tools work without authentication; "
             f"OAuth sign-in (see {_NAMEAI_API_BASE_URL}/auth.md) additionally unlocks real "
             "marketplace prices on domain searches."
         ),
-        "icon": f"{_NAMEAI_API_BASE_URL}/logo.png",
-        "iconUrl": f"{_NAMEAI_API_BASE_URL}/logo.png",
+        "version": "1.0.0",
+        "serverUrl": f"{_MCP_PUBLIC_URL}/mcp",
         "url": f"{_MCP_PUBLIC_URL}/mcp",
         "transport": "streamable-http",
-        "version": "1.0.0",
+        "protocolVersion": "2025-06-18",
+        "icon": f"{_NAMEAI_API_BASE_URL}/logo.png",
+        "iconUrl": f"{_NAMEAI_API_BASE_URL}/logo.png",
         "publisher": {"name": "Name.ai", "url": _NAMEAI_API_BASE_URL},
+        "homepage": f"{_NAMEAI_API_BASE_URL}/developers",
+        "repository": "https://github.com/namekart/nameai_mcp",
+        "registry": {"name": "ai.name/nameai-mcp", "url": "https://registry.modelcontextprotocol.io/v0/servers?search=ai.name/nameai-mcp"},
         "auth": {
             "type": "oauth2.1",
             "optional": True,
             "authorization_server_metadata": f"{_NAMEAI_API_BASE_URL}/.well-known/oauth-authorization-server",
+            "protected_resource_metadata": f"{_MCP_PUBLIC_URL}/.well-known/oauth-protected-resource",
             "docs": f"{_NAMEAI_API_BASE_URL}/auth.md",
         },
+        "tools": tools,
     }
 
 
