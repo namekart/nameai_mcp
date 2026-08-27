@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 import httpx
-from mcp.server.apps import Apps
+from mcp.server.apps import Apps, ResourceCsp
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.types import ToolAnnotations
 
@@ -37,6 +37,14 @@ apps.add_html_resource(
     name="search-results",
     title="Domain availability results",
     description="Renders search_domain results as availability cards with pricing.",
+    # Mirrors the <meta http-equiv="Content-Security-Policy"> inside the view:
+    # inline CSS/JS only, images from name.ai, connections only to the MCP
+    # server and name.ai, nothing framed.
+    csp=ResourceCsp(
+        connect_domains=["https://nameai-mcp.h.namekart.com", "https://name.ai"],
+        resource_domains=["https://name.ai"],
+        frame_domains=[],
+    ),
     prefers_border=True,
 )
 
