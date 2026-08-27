@@ -187,3 +187,42 @@ def auth_resource() -> str:
         "4. Pass `Authorization: Bearer <access_token>` on tool calls.\n\n"
         "Full walkthrough: https://name.ai/auth.md\n"
     )
+
+
+# ─── Protocol-level errors for invalid calls ─────────────────────────────────
+# The SDK turns an unknown tool or a failed argument validation into a
+# CallToolResult with is_error=True and a free-text message. The MCP spec
+# classifies both as *protocol* errors (JSON-RPC -32602 Invalid params), and
+# agents key off a structured code, so route them through MCPError instead.
+# Genuine execution failures inside a tool keep the is_error result shape.
+from pydantic import ValidationError  # noqa: E402
+from mcp.server.mcpserver.exceptions import ToolError  # noqa: E402
+from mcp.shared.exceptions import MCPError  # noqa: E402
+from mcp.types import INVALID_PARAMS  # noqa: E402
+
+_sdk_call_tool = mcp.call_tool
+
+
+async def _call_tool_with_structured_errors(name, arguments, context=None):
+    available = sorted(t.name for t in await mcp.list_tools())
+    if name not in available:
+        raise MCPError(
+            INVALID_PARAMS,
+            f"Unknown tool: {name}",
+            data={"code": "unknown_tool", "tool": name, "available_tools": available},
+        )
+    try:
+        return await _sdk_call_tool(name, arguments, context)
+    except ToolError as exc:
+        cause = exc.__cause__
+        if isinstance(cause, ValidationError):
+            fields = sorted({".".join(str(p) for p in e["loc"]) for e in cause.errors()})
+            raise MCPError(
+                INVALID_PARAMS,
+                f"Invalid arguments for {name}: {', '.join(fields) or 'schema mismatch'}",
+                data={"code": "invalid_arguments", "tool": name, "fields": fields},
+            ) from exc
+        raise
+
+
+mcp.call_tool = _call_tool_with_structured_errors
