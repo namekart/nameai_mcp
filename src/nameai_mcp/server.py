@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Literal
 
 import httpx
+from mcp.server.apps import Apps
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.types import ToolAnnotations
 
 from nameai_mcp.nameai_client import NameAIAPIError, get_json, post_json, post_ndjson_rows
 from nameai_mcp.oauth_verifier import verify_bearer_token
+from nameai_mcp.search_app_html import SEARCH_APP_HTML, SEARCH_APP_URI
 
 # Deliberately NOT passing auth=AuthSettings(...) here. The lowlevel Server's
 # streamable_http_app() would happily publish RFC 9728 discovery metadata
@@ -18,31 +20,28 @@ from nameai_mcp.oauth_verifier import verify_bearer_token
 # valid bearer token for the 3 public tools too. Not achievable through this
 # SDK class without breaking that contract. OAuth discoverability instead
 # comes from .well-known/mcp.json's custom "auth" field and AUTH.md.
-mcp = MCPServer(
-    name="nameai-mcp",
-    version="1.0.0",
-    instructions=(
-        "Name.ai domain tools: check domain availability (search_domain), look up "
-        "WHOIS records (whois_lookup), and get TLD registration pricing "
-        "(tld_registration_price) and registry requirements (tld_requirements). "
-        "All tools are read-only and work without authentication. Marketplace "
-        "prices on search_domain are masked for anonymous callers - pass an OAuth "
-        "Bearer token (see https://name.ai/auth.md) to see them. whois_lookup is "
-        "rate limited to 10/day per caller IP; cache TLD pricing/requirements, "
-        "they change rarely."
-    ),
-)
-
 # Every tool is a read-only lookup against name.ai / public registries -
 # annotate so agents know calls are safe to make and repeat.
 _READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True)
 
-# RDAP can retry against multiple registries before falling back to DomainIQ
-# (see app/api/tools/whois/route.js) — needs more headroom than other calls.
-_WHOIS_TIMEOUT = httpx.Timeout(connect=10.0, read=45.0, write=10.0, pool=10.0)
+# MCP Apps (io.modelcontextprotocol/ui): search_domain carries
+# _meta.ui.resourceUri pointing at a ui:// HTML view the host can render
+# inline (availability cards). Hosts that didn't negotiate Apps still get
+# the same structured/JSON result - the view is additive. The extension's
+# tools and resources are consumed when MCPServer is constructed, so this
+# block has to precede it.
+apps = Apps()
+apps.add_html_resource(
+    SEARCH_APP_URI,
+    SEARCH_APP_HTML,
+    name="search-results",
+    title="Domain availability results",
+    description="Renders search_domain results as availability cards with pricing.",
+    prefers_border=True,
+)
 
 
-@mcp.tool(annotations=_READ_ONLY)
+@apps.tool(resource_uri=SEARCH_APP_URI, annotations=_READ_ONLY)
 async def search_domain(domain: str, include_alternates: bool = True, ctx: Context = None) -> dict:
     """Check whether a domain is available and, for the same label, whether its
     common alternate TLDs are too (e.g. querying "acme.com" also returns
@@ -73,6 +72,29 @@ async def search_domain(domain: str, include_alternates: bool = True, ctx: Conte
         primary = rows[0]["domain"]
         rows = [r for r in rows if r["domain"] == primary]
     return {"query": domain, "results": rows}
+
+
+mcp = MCPServer(
+    name="nameai-mcp",
+    version="1.0.0",
+    instructions=(
+        "Name.ai domain tools: check domain availability (search_domain), look up "
+        "WHOIS records (whois_lookup), and get TLD registration pricing "
+        "(tld_registration_price) and registry requirements (tld_requirements). "
+        "All tools are read-only and work without authentication. Marketplace "
+        "prices on search_domain are masked for anonymous callers - pass an OAuth "
+        "Bearer token (see https://name.ai/auth.md) to see them. whois_lookup is "
+        "rate limited to 10/day per caller IP; cache TLD pricing/requirements, "
+        "they change rarely."
+    ),
+    extensions=[apps],
+)
+
+# RDAP can retry against multiple registries before falling back to DomainIQ
+# (see app/api/tools/whois/route.js) — needs more headroom than other calls.
+_WHOIS_TIMEOUT = httpx.Timeout(connect=10.0, read=45.0, write=10.0, pool=10.0)
+
+
 
 
 @mcp.tool(annotations=_READ_ONLY)
