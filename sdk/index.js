@@ -16,7 +16,7 @@ export class NameAI {
   }
 
   _headers(extra = {}) {
-    const h = { accept: 'application/json', 'user-agent': 'nameai-sdk/1.1.0 (+https://name.ai/developers)', ...extra };
+    const h = { accept: 'application/json', 'user-agent': 'nameai-sdk/1.1.1 (+https://name.ai/developers)', ...extra };
     if (this.accessToken) h.authorization = `Bearer ${this.accessToken}`;
     return h;
   }

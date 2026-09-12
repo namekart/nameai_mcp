@@ -1,14 +1,20 @@
 {
   "name": "nameai-sdk",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Official JavaScript SDK for the Name.ai public API: domain search/availability, WHOIS lookup, TLD registration pricing and registry requirements, marketplace listings with cursor pagination, and batched reads.",
   "keywords": [
     "nameai",
     "name.ai",
+    "sdk",
+    "api",
+    "api-client",
+    "client",
     "domains",
+    "domain-names",
     "domain-search",
     "whois",
     "tld",
+    "registrar",
     "mcp"
   ],
   "homepage": "https://name.ai",

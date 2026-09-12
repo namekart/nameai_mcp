@@ -24,7 +24,7 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence
 
 __all__ = ["NameAI", "NameAIError", "__version__"]
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 DEFAULT_BASE_URL = "https://name.ai"
 _USER_AGENT = f"nameai-python/{__version__} (+https://name.ai/developers)"

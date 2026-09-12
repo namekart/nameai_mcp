@@ -1,12 +1,12 @@
 [project]
 name = "nameai"
-version = "1.1.0"
+version = "1.1.1"
 description = "Official Python SDK for the Name.ai public API: domain search/availability, WHOIS lookup, TLD registration pricing and registry requirements, marketplace listings with cursor pagination, and batched reads."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "Name.ai", email = "support@name.ai" }]
-keywords = ["nameai", "name.ai", "domains", "domain-search", "whois", "tld", "mcp"]
+keywords = ["nameai", "name.ai", "sdk", "api", "api-client", "client", "domains", "domain-names", "domain-search", "whois", "tld", "registrar", "mcp"]
 # No dependencies on purpose: the whole client is urllib from the standard
 # library. An SDK for six read endpoints should not drag a transport stack into
 # someone else's dependency tree.
