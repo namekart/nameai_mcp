@@ -59,6 +59,64 @@ def oauth_protected_resource() -> dict:
     }
 
 
+# The MCP manifest, mirrored onto this origin.
+#
+# name.ai serves the canonical copy at both these paths, and the server card
+# next to them was already mirrored here for a reason that applies just as
+# much to the manifest: a client handed the MCP URL — rather than the brand
+# domain — looks for the manifest on the origin it was given. Ours answered
+# 404 there, so anything checking "is there a standard manifest endpoint for
+# this server" concluded there wasn't one, while name.ai's own copies read
+# fine. Two paths because the extensionless form is what the discovery
+# convention names and the .json form is what most clients try first.
+_MCP_DESCRIPTION = (
+    "Domain search/availability, WHOIS lookup, TLD registration pricing, and TLD "
+    "registration requirements for name.ai. All tools work without authentication; "
+    "signing in via OAuth (see auth section below) additionally unlocks real marketplace "
+    "prices on domain searches."
+)
+
+
+def _mcp_manifest() -> dict:
+    """Kept byte-compatible with name.ai/.well-known/mcp.json — same keys, same
+    order, same values. Two copies of one document is already one too many; a
+    third shape would be worse."""
+    endpoint = f"{_MCP_PUBLIC_URL}/mcp"
+    return {
+        "mcpUrl": endpoint,
+        "servers": [
+            {
+                "name": "name.ai",
+                "url": endpoint,
+                "transport": "streamable-http",
+                "description": _MCP_DESCRIPTION,
+            }
+        ],
+        "mcpServers": {
+            "name-ai": {"type": "http", "url": endpoint, "description": _MCP_DESCRIPTION}
+        },
+        "openapi": f"{_NAMEAI_API_BASE_URL}/openapi.json",
+        "auth": {
+            "type": "oauth2.1",
+            "authorization_server_metadata": (
+                f"{_NAMEAI_API_BASE_URL}/.well-known/oauth-authorization-server"
+            ),
+            "docs": f"{_NAMEAI_API_BASE_URL}/AUTH.md",
+            "optional": True,
+        },
+    }
+
+
+@app.get("/.well-known/mcp")
+def mcp_manifest() -> dict:
+    return _mcp_manifest()
+
+
+@app.get("/.well-known/mcp.json")
+def mcp_manifest_json() -> dict:
+    return _mcp_manifest()
+
+
 # Server card on the MCP host itself. name.ai serves the canonical copy at
 # the same path; scanners that take the MCP URL as their subject (rather than
 # the brand domain) look for it on this origin, so it's mirrored here.
