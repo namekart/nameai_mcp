@@ -16,7 +16,7 @@ export class NameAI {
   }
 
   _headers(extra = {}) {
-    const h = { accept: 'application/json', 'user-agent': 'nameai-sdk/1.0.0 (+https://name.ai/developers)', ...extra };
+    const h = { accept: 'application/json', 'user-agent': 'nameai-sdk/1.1.0 (+https://name.ai/developers)', ...extra };
     if (this.accessToken) h.authorization = `Bearer ${this.accessToken}`;
     return h;
   }
@@ -95,14 +95,56 @@ export class NameAI {
   }
 
   /**
-   * Marketplace listings (offset pagination). Prices require auth
-   * (scope pricing:read) — masked to null otherwise.
-   * @param {{ limit?: number, offset?: number, q?: string, tld?: string, max?: number, sort?: "newest"|"price_asc"|"price_desc" }} [params]
+   * Marketplace listings. Prices require auth (scope pricing:read) — masked to
+   * null otherwise.
+   *
+   * Pass `cursor` from a previous `page.next_cursor` rather than incrementing
+   * `offset`: a cursor names the row you stopped at, so a listing sold or added
+   * mid-walk cannot shift the window. `listAllListings` does this for you.
+   *
+   * @param {{ limit?: number, offset?: number, cursor?: string, q?: string, tld?: string, max?: number, sort?: "newest"|"price_asc"|"price_desc" }} [params]
    */
   async marketListings(params = {}) {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) if (v != null) qs.set(k, String(v));
     const res = await this._fetch(`${this.baseUrl}/api/market/listings?${qs}`, { headers: this._headers() });
+    return this._json(res);
+  }
+
+  /**
+   * Every matching listing, walked by cursor. Yields one page at a time so a
+   * large catalogue never has to be held in memory at once.
+   *
+   * @param {{ limit?: number, q?: string, tld?: string, max?: number, sort?: "newest"|"price_asc"|"price_desc" }} [params]
+   * @returns {AsyncGenerator<object, void, void>} individual listings
+   */
+  async *listAllListings(params = {}) {
+    let cursor;
+    for (;;) {
+      const { items, page } = await this.marketListings({ ...params, cursor });
+      for (const item of items || []) yield item;
+      if (!page?.next_cursor) return;
+      cursor = page.next_cursor;
+    }
+  }
+
+  /**
+   * Several public reads in ONE request. Prefer this over a loop: it is one
+   * round trip, and each operation is billed against the rate limit exactly as
+   * the individual call would have been.
+   *
+   * @param {Array<{ id?: string, op: "search_domain"|"whois_lookup"|"tld_registration_price"|"tld_requirements", params?: object }>} operations
+   *   Up to 20. `params` is `{q}`, `{domain}`, `{tld, op}` or `{tld}` respectively.
+   * @returns {Promise<{ results: Array<{ id: string, op: string|null, status: number, body: any }>, count: number, failed: number }>}
+   *   One result per operation, in order. Each carries its own status — a
+   *   failure in one does not fail the batch.
+   */
+  async batch(operations) {
+    const res = await this._fetch(`${this.baseUrl}/api/batch`, {
+      method: 'POST',
+      headers: this._headers({ 'content-type': 'application/json' }),
+      body: JSON.stringify({ operations }),
+    });
     return this._json(res);
   }
 }

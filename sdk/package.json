@@ -1,16 +1,36 @@
 {
   "name": "nameai-sdk",
-  "version": "1.0.0",
-  "description": "Official JavaScript SDK for the Name.ai public API: domain search/availability, WHOIS lookup, TLD registration pricing and registry requirements, and marketplace listings.",
-  "keywords": ["nameai", "name.ai", "domains", "domain-search", "whois", "tld", "mcp"],
+  "version": "1.1.0",
+  "description": "Official JavaScript SDK for the Name.ai public API: domain search/availability, WHOIS lookup, TLD registration pricing and registry requirements, marketplace listings with cursor pagination, and batched reads.",
+  "keywords": [
+    "nameai",
+    "name.ai",
+    "domains",
+    "domain-search",
+    "whois",
+    "tld",
+    "mcp"
+  ],
   "homepage": "https://name.ai/developers",
-  "repository": { "type": "git", "url": "git+https://github.com/namekart/nameai_mcp.git", "directory": "sdk" },
-  "bugs": { "url": "https://github.com/namekart/nameai_mcp/issues" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/namekart/nameai_mcp.git",
+    "directory": "sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/namekart/nameai_mcp/issues"
+  },
   "license": "MIT",
   "author": "Name.ai (https://name.ai)",
   "type": "module",
   "main": "index.js",
   "types": "index.d.ts",
-  "files": ["index.js", "index.d.ts", "README.md"],
-  "engines": { "node": ">=18" }
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
 }

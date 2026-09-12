@@ -1,0 +1,37 @@
+[project]
+name = "nameai"
+version = "1.1.0"
+description = "Official Python SDK for the Name.ai public API: domain search/availability, WHOIS lookup, TLD registration pricing and registry requirements, marketplace listings with cursor pagination, and batched reads."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Name.ai", email = "support@name.ai" }]
+keywords = ["nameai", "name.ai", "domains", "domain-search", "whois", "tld", "mcp"]
+# No dependencies on purpose: the whole client is urllib from the standard
+# library. An SDK for six read endpoints should not drag a transport stack into
+# someone else's dependency tree.
+dependencies = []
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Internet :: Name Service (DNS)",
+  "Typing :: Typed",
+]
+
+# These are how a package is tied back to the product it belongs to — an agent
+# (or a person) checking whether this is the official SDK reads them.
+[project.urls]
+Homepage = "https://name.ai"
+Documentation = "https://name.ai/developers/api"
+"API Specification" = "https://name.ai/openapi.json"
+Source = "https://github.com/namekart/nameai_mcp"
+Issues = "https://github.com/namekart/nameai_mcp/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nameai"]
