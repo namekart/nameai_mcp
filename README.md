@@ -40,14 +40,26 @@ injects a different port.
 
 ## Deploying
 
-Any host that can run the Docker image works. To make it reachable by AI
-agents as `https://mcp.name.ai`, DNS for `name.ai` is on Cloudflare — add an
-`A`/`CNAME` record for the `mcp` subdomain pointing at wherever this
-container runs, and terminate TLS there (e.g. via Coolify/Traefik if hosted
-alongside the rest of nameaiv1).
+Any host that can run the Docker image works. It is deployed through Coolify
+on the Hetzner server and served at **`https://nameai-mcp.h.namekart.com/mcp`**
+(streamable-http), with Traefik terminating TLS. There is no `mcp.name.ai`
+record — the `*.h.namekart.com` wildcard already points at Hetzner, so the
+subdomain was never needed.
 
-Being reachable isn't the same as being *discovered* — nothing on
-`name.ai` currently points at this server. For an agent (or a scanner like
-ora) to find it, name.ai itself needs a pointer to it, e.g. a line in
-`/llms.txt` or a `.well-known/mcp.json` manifest. That's a change in the
-nameaiv1 repo, not this one.
+The server calls the public API at `NAMEAI_API_BASE_URL`, default
+`https://name.ai`. Since name.ai moved to Hetzner that resolves to the same
+host this container runs on, so the calls leave the container, reach the
+host's own public IP, and come back in through Traefik. That hairpin works
+here and is left in place deliberately: talking to the API exactly the way an
+outside client would is the point of this server.
+
+Being reachable isn't the same as being discovered — and that part is done.
+`name.ai` advertises this server in four places:
+
+- `https://name.ai/.well-known/mcp.json` — manifest
+- `https://name.ai/.well-known/mcp/server-card.json` — server card
+- `https://name.ai/llms.txt` — in both the endpoint list and the tool guidance
+- the MCP Registry, namespace `ai.name`, domain-verified
+
+All four live in the nameaiv1 repo. If the deployed URL changes, they change
+with it — otherwise agents keep being pointed at the old one.
