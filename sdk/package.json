@@ -11,7 +11,8 @@
     "tld",
     "mcp"
   ],
-  "homepage": "https://name.ai/developers",
+  "homepage": "https://name.ai",
+  "documentation": "https://name.ai/developers/api",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/namekart/nameai_mcp.git",
