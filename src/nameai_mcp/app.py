@@ -1,7 +1,11 @@
+import json
 import os
 
 from fastapi import FastAPI
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.datastructures import Headers, MutableHeaders
+from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from nameai_mcp.server import mcp
 
@@ -102,8 +106,113 @@ async def mcp_server_card() -> dict:
     }
 
 
+class AcceptJsonOnlyMiddleware:
+    """Let a client that only speaks JSON talk to the Streamable HTTP endpoint.
+
+    The transport spec says a POST to /mcp must accept BOTH application/json
+    and text/event-stream, and the SDK enforces it with a 406. Strictly that is
+    correct. In practice a great many clients — scanners, curl one-liners, any
+    HTTP library whose default is `Accept: application/json` — send only the
+    one, and a 406 on the very first handshake is indistinguishable from "this
+    server does not exist". We were failing exactly that way: every check that
+    needed a live session reported no MCP server at all, while the manifests
+    pointing at it read fine.
+
+    So a JSON-only client gets served rather than refused. Inbound, the Accept
+    header is widened so the SDK proceeds. Outbound, if the reply came back as
+    a single SSE frame, it is unwrapped to the JSON body inside it, because a
+    client that asked for JSON cannot parse `event:`/`data:` framing.
+
+    Clients that do send both headers are untouched: they keep the streaming
+    behaviour, and anything genuinely multi-frame is passed through as SSE
+    rather than mangled into a JSON body it does not fit.
+    """
+
+    _SSE = "text/event-stream"
+    _JSON = "application/json"
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = Headers(scope=scope)
+        accept = headers.get("accept", "")
+        json_only = self._JSON in accept and self._SSE not in accept
+        if not json_only:
+            await self.app(scope, receive, send)
+            return
+
+        # Widen Accept so the SDK's own check passes.
+        patched = MutableHeaders(scope=scope)
+        patched["accept"] = f"{self._JSON}, {self._SSE}"
+
+        start: Message | None = None
+        body = bytearray()
+
+        async def capture(message: Message) -> None:
+            nonlocal start
+            if message["type"] == "http.response.start":
+                start = message
+            elif message["type"] == "http.response.body":
+                body.extend(message.get("body", b""))
+                if message.get("more_body"):
+                    return
+                await self._finish(start, bytes(body), send)
+
+        await self.app(scope, receive, capture)
+
+    async def _finish(self, start: Message | None, body: bytes, send: Send) -> None:
+        if start is None:
+            return
+        content_type = Headers(raw=start["headers"]).get("content-type", "")
+        payload = self._unwrap_sse(body) if self._SSE in content_type else None
+        if payload is None:
+            # Not a single-frame SSE reply — pass it through untouched.
+            await send(start)
+            await send({"type": "http.response.body", "body": body})
+            return
+        response = Response(
+            content=payload,
+            status_code=start["status"],
+            media_type=self._JSON,
+        )
+        # Session id and the rest of the transport's headers must survive.
+        for key, value in Headers(raw=start["headers"]).items():
+            if key.lower() not in {"content-type", "content-length"}:
+                response.headers[key] = value
+        await response(  # type: ignore[call-arg]
+            {"type": "http"},
+            self._empty_receive,
+            send,
+        )
+
+    @staticmethod
+    def _unwrap_sse(body: bytes) -> bytes | None:
+        """The JSON inside a single-frame SSE reply, or None if it isn't one."""
+        try:
+            text = body.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+        data = [line[5:].strip() for line in text.splitlines() if line.startswith("data:")]
+        if len(data) != 1:
+            return None
+        try:
+            json.loads(data[0])
+        except ValueError:
+            return None
+        return data[0].encode("utf-8")
+
+    @staticmethod
+    async def _empty_receive() -> Message:
+        return {"type": "http.disconnect"}
+
+
 # streamable_http_app() registers its own endpoint internally at "/mcp", so
 # mounting it here at root gives a clean external path (GET /health, POST/GET
 # /mcp) instead of a doubled-up "/mcp-server/mcp". /health above is registered
 # first and matches exactly, so it isn't swallowed by this catch-all mount.
-app.mount("/", mcp_app)
+app.mount("/", AcceptJsonOnlyMiddleware(mcp_app))
