@@ -3,7 +3,7 @@
   "name": "ai.name/nameai-mcp",
   "title": "Name.ai MCP Server",
   "description": "Domain availability search, WHOIS lookup, TLD pricing and registry rules from name.ai. Read-only.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "websiteUrl": "https://name.ai/developers",
   "repository": {
     "url": "https://github.com/namekart/nameai_mcp",
@@ -12,7 +12,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://nameai-mcp.h.namekart.com/mcp"
+      "url": "https://mcp.name.ai/mcp"
     }
   ]
 }
