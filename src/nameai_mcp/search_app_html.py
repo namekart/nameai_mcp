@@ -19,7 +19,7 @@ SEARCH_APP_HTML = r"""<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https://name.ai data:; font-src 'self'; connect-src https://nameai-mcp.h.namekart.com https://name.ai; form-action https://name.ai; frame-ancestors https://chatgpt.com https://claude.ai https://claude.com; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https://name.ai data:; font-src 'self'; connect-src https://mcp.name.ai https://nameai-mcp.h.namekart.com https://name.ai; form-action https://name.ai; frame-ancestors https://chatgpt.com https://claude.ai https://claude.com; base-uri 'none'">
 <title>Name.ai domain search</title>
 <style>
   :root {

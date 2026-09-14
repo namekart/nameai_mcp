@@ -41,7 +41,7 @@ apps.add_html_resource(
     # inline CSS/JS only, images from name.ai, connections only to the MCP
     # server and name.ai, nothing framed.
     csp=ResourceCsp(
-        connect_domains=["https://nameai-mcp.h.namekart.com", "https://name.ai"],
+        connect_domains=["https://mcp.name.ai", "https://nameai-mcp.h.namekart.com", "https://name.ai"],
         resource_domains=["https://name.ai"],
         frame_domains=[],
     ),

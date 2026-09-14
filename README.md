@@ -41,10 +41,18 @@ injects a different port.
 ## Deploying
 
 Any host that can run the Docker image works. It is deployed through Coolify
-on the Hetzner server and served at **`https://nameai-mcp.h.namekart.com/mcp`**
-(streamable-http), with Traefik terminating TLS. There is no `mcp.name.ai`
-record — the `*.h.namekart.com` wildcard already points at Hetzner, so the
-subdomain was never needed.
+on the Hetzner server and served at **`https://mcp.name.ai/mcp`**
+(streamable-http), with Traefik terminating TLS. The original hostname,
+`https://nameai-mcp.h.namekart.com/mcp`, still routes to the same container, so
+client configs written against it keep working.
+
+`mcp.name.ai` is a DNS-only A record to the Hetzner box. It exists because
+scanners and MCP tooling look for a server at `mcp.<domain>` instead of reading
+the URL out of a manifest — ora's scanner was watched, in this container's own
+access log, never dialling the manifest's `mcpUrl` during a scan. Adding a
+hostname needs two things besides DNS: the domain on the Coolify app, and the
+host appended to `MCP_ALLOWED_HOSTS`, without which the SDK's DNS-rebinding
+guard answers it with 421.
 
 The server calls the public API at `NAMEAI_API_BASE_URL`, default
 `https://name.ai`. Since name.ai moved to Hetzner that resolves to the same

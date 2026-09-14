@@ -45,7 +45,7 @@ def health() -> dict[str, str]:
 # server.py). Publishing this document doesn't require any enforcement
 # logic, so it's safe to hand-write independent of that constraint.
 _NAMEAI_API_BASE_URL = os.environ.get("NAMEAI_API_BASE_URL", "https://name.ai")
-_MCP_PUBLIC_URL = os.environ.get("MCP_PUBLIC_URL", "https://nameai-mcp.h.namekart.com")
+_MCP_PUBLIC_URL = os.environ.get("MCP_PUBLIC_URL", "https://mcp.name.ai")
 
 
 @app.get("/.well-known/oauth-protected-resource")

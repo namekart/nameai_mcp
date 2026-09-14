@@ -53,5 +53,5 @@ and pass `{ accessToken }`.
 - API docs: https://name.ai/developers/api
 - OpenAPI spec: https://name.ai/openapi.json
 - Python SDK, same surface: `pip install nameai`
-- MCP server (same tools for agents): `https://nameai-mcp.h.namekart.com/mcp`
+- MCP server (same tools for agents): `https://mcp.name.ai/mcp`
 - Rate limits and quotas: https://name.ai/pricing.md

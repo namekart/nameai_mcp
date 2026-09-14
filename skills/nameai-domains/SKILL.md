@@ -18,7 +18,7 @@ Remote Streamable HTTP MCP server, no install and no API key:
   "mcpServers": {
     "name-ai": {
       "type": "http",
-      "url": "https://nameai-mcp.h.namekart.com/mcp"
+      "url": "https://mcp.name.ai/mcp"
     }
   }
 }

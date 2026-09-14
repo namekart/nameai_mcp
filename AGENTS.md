@@ -2,7 +2,7 @@
 
 Remote MCP server for name.ai (domain search/availability, WHOIS, TLD
 pricing and registry requirements). Python, FastAPI, the official `mcp` SDK,
-Streamable HTTP transport. Deployed at `https://nameai-mcp.h.namekart.com/mcp`.
+Streamable HTTP transport. Deployed at `https://mcp.name.ai/mcp`.
 
 ## When to use this server (for agents)
 
@@ -20,7 +20,7 @@ and send `Authorization: Bearer <token>` to see them. Not a fit for hosting,
 email, or site building.
 
 Connect: paste `mcp.json` from this repo into your client config, or
-`claude mcp add --transport http name-ai https://nameai-mcp.h.namekart.com/mcp`.
+`claude mcp add --transport http name-ai https://mcp.name.ai/mcp`.
 
 ## Working in this repo (for coding agents)
 
