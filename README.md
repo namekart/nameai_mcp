@@ -18,6 +18,28 @@ HTTP client that talks to name.ai.
 - `NAMEAI_API_BASE_URL` — base URL of the name.ai API this server calls.
   Defaults to `https://name.ai`.
 - `HOST` / `PORT` — bind address for the server itself. Default `0.0.0.0:8000`.
+- `OAUTH_INTROSPECTION_SECRET` — pre-shared with name.ai. Required: every tool
+  call is metered through name.ai's `POST /api/internal/mcp-usage/consume`
+  (see [src/nameai_mcp/quota.py](src/nameai_mcp/quota.py)), and the same secret
+  is sent upstream as `x-nameai-mcp-key` so name.ai skips its per-IP caps.
+
+## Sign-in and usage quotas
+
+Every `/mcp` call needs a name.ai OAuth token. Without one the server answers
+401 with `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource"`,
+so MCP clients (Grok, Cursor, Claude) run the OAuth flow against name.ai, where
+the user signs in with X. Tokens are verified via name.ai's introspection
+endpoint (`oauth_verifier.py`, cached 60 s).
+
+Each tool call is then metered by name.ai (`mcp_usage/` in the main app):
+
+| User | WHOIS (`whois_lookup`) | Search bucket (`search_domain`, `tld_registration_price`, `tld_requirements`) |
+|---|---|---|
+| Signed in with X, profile not completed | 3 / UTC day | 4 / UTC day |
+| Profile completed at `https://name.ai/mcp/onboard` (full name + phone; billing optional) | 20 / calendar month | 100 / calendar month |
+
+Over the limit, the tool returns an error result telling the user how to get
+more. If the meter can't be reached, tools fail closed.
 
 ## Local development
 

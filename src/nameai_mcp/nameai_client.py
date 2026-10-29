@@ -1,13 +1,12 @@
-"""Thin async client for the public name.ai JSON API.
+"""Thin async client for the public, no-auth-required name.ai JSON API.
 
-Every endpoint called here works without authentication (see route source for
-each — linked in docstrings on the call sites in server.py). Two of them
-apply name.ai's price-visibility policy server-side: an unauthenticated
-caller gets aftermarket/marketplace prices masked to null and only sees
+Every endpoint called here is reachable without a session cookie today (see
+route source for each — linked in docstrings on the call sites in server.py).
+Two of them apply name.ai's price-visibility policy server-side: an
+unauthenticated caller (which every MCP request is, since we never forward a
+session) gets aftermarket/marketplace prices masked to null and only sees
 new-registration TLD pricing. That's intentional upstream behavior, not a bug
-here — see lib/server/price-visibility.js in the main app. search_domain
-forwards a valid OAuth Bearer token when the caller has one (see
-oauth_verifier.py), which lifts that mask — see AUTH.md on name.ai.
+here — see lib/server/price-visibility.js in the main app.
 """
 
 from __future__ import annotations

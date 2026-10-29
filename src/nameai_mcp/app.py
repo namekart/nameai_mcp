@@ -37,13 +37,10 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# RFC 9728 Protected Resource Metadata — a plain static document, published
-# by hand rather than via the SDK's own auto-generated route. The SDK only
-# generates this when MCPServer(auth=..., token_verifier=...) is set, and
-# token_verifier wraps the entire /mcp endpoint in RequireAuthMiddleware,
-# requiring a token for the 3 public tools too — not something we want (see
-# server.py). Publishing this document doesn't require any enforcement
-# logic, so it's safe to hand-write independent of that constraint.
+# RFC 9728 Protected Resource Metadata. /mcp now requires a token (server.py
+# sets auth + token_verifier), and its 401 points WWW-Authenticate
+# resource_metadata here. The SDK mounts its own copy of this route too; this
+# FastAPI route is matched first and adds resource_documentation.
 _NAMEAI_API_BASE_URL = os.environ.get("NAMEAI_API_BASE_URL", "https://name.ai")
 _MCP_PUBLIC_URL = os.environ.get("MCP_PUBLIC_URL", "https://mcp.name.ai")
 
@@ -71,9 +68,9 @@ def oauth_protected_resource() -> dict:
 # convention names and the .json form is what most clients try first.
 _MCP_DESCRIPTION = (
     "Domain search/availability, WHOIS lookup, TLD registration pricing, and TLD "
-    "registration requirements for name.ai. All tools work without authentication; "
-    "signing in via OAuth (see auth section below) additionally unlocks real marketplace "
-    "prices on domain searches."
+    "registration requirements for name.ai. Sign in with OAuth (Login with X on "
+    "name.ai): 3 WHOIS + 4 searches per day free, 20 WHOIS + 100 searches per month "
+    "with a completed name.ai profile. Real marketplace prices included."
 )
 
 
@@ -102,7 +99,7 @@ def _mcp_manifest() -> dict:
                 f"{_NAMEAI_API_BASE_URL}/.well-known/oauth-authorization-server"
             ),
             "docs": f"{_NAMEAI_API_BASE_URL}/AUTH.md",
-            "optional": True,
+            "optional": False,
         },
     }
 
@@ -138,9 +135,9 @@ async def mcp_server_card() -> dict:
         "displayName": "Name.ai MCP Server",
         "description": (
             "Domain search/availability, WHOIS lookup, TLD registration pricing, and TLD "
-            "registration requirements as MCP tools. All tools work without authentication; "
-            f"OAuth sign-in (see {_NAMEAI_API_BASE_URL}/auth.md) additionally unlocks real "
-            "marketplace prices on domain searches."
+            "registration requirements as MCP tools. Requires OAuth sign-in (Login with X; "
+            f"see {_NAMEAI_API_BASE_URL}/auth.md): 3 WHOIS + 4 searches per day free, "
+            "20 WHOIS + 100 searches per month with a completed name.ai profile."
         ),
         "version": "1.0.0",
         "serverUrl": f"{_MCP_PUBLIC_URL}/mcp",
@@ -155,7 +152,7 @@ async def mcp_server_card() -> dict:
         "registry": {"name": "ai.name/nameai-mcp", "url": "https://registry.modelcontextprotocol.io/v0/servers?search=ai.name/nameai-mcp"},
         "auth": {
             "type": "oauth2.1",
-            "optional": True,
+            "optional": False,
             "authorization_server_metadata": f"{_NAMEAI_API_BASE_URL}/.well-known/oauth-authorization-server",
             "protected_resource_metadata": f"{_MCP_PUBLIC_URL}/.well-known/oauth-protected-resource",
             "docs": f"{_NAMEAI_API_BASE_URL}/auth.md",
