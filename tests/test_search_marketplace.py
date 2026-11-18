@@ -66,6 +66,7 @@ class SearchMarketplaceTest(unittest.IsolatedAsyncioTestCase):
         tools = {t.name: t for t in await server.mcp.list_tools()}
         tool = tools["search_premium_domains"]
         self.assertTrue(tool.annotations.read_only_hint)
+        self.assertEqual(tool.title, "Search premium domains for sale")
         self.assertEqual(tool.meta["ui"]["resourceUri"], "ui://nameai/market-results.html")
         self.assertIn("results", tool.output_schema["properties"])
 
@@ -106,3 +107,16 @@ class LimitsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DirectoryRequirementsTest(unittest.IsolatedAsyncioTestCase):
+    async def test_every_tool_has_title_and_read_only_hint(self):
+        for t in await server.mcp.list_tools():
+            self.assertTrue(t.title, t.name)
+            self.assertTrue(t.annotations and t.annotations.read_only_hint, t.name)
+            self.assertLessEqual(len(t.name), 64)
+
+    async def test_name_ai_errors_reach_the_model(self):
+        with patch.object(server, "post_json", AsyncMock(side_effect=NameAIAPIError(429, "WHOIS limit reached for today"))):
+            with self.assertRaisesRegex(ToolError, "WHOIS limit reached for today"):
+                await server.mcp.call_tool("whois_lookup", {"domain": "example.com"})

@@ -17,6 +17,7 @@ import os
 from typing import Any
 
 import httpx
+from mcp.server.mcpserver.exceptions import ToolError
 
 API_BASE_URL = os.environ.get("NAMEAI_API_BASE_URL", "https://name.ai").rstrip("/")
 _TIMEOUT = httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=10.0)
@@ -33,8 +34,12 @@ def mcp_key_headers() -> dict[str, str] | None:
     return {"x-nameai-mcp-key": _MCP_KEY} if _MCP_KEY else None
 
 
-class NameAIAPIError(RuntimeError):
-    """Raised when the name.ai API returns a non-2xx response."""
+class NameAIAPIError(ToolError):
+    """Raised when the name.ai API returns a non-2xx response.
+
+    A ToolError, so the SDK passes the message to the model instead of a
+    bare "Error executing tool" (directory review rejects generic errors).
+    """
 
     def __init__(self, status_code: int, message: str):
         super().__init__(message)

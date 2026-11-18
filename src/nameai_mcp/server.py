@@ -55,7 +55,7 @@ apps.add_html_resource(
 )
 
 
-@apps.tool(resource_uri=SEARCH_APP_URI, annotations=_READ_ONLY)
+@apps.tool(resource_uri=SEARCH_APP_URI, title="Check domain availability", annotations=_READ_ONLY)
 async def search_domain(domain: str, include_alternates: bool = True, ctx: Context = None) -> dict:
     """Check whether a domain is available and, for the same label, whether its
     common alternate TLDs are too (e.g. querying "acme.com" also returns
@@ -132,7 +132,7 @@ apps.add_html_resource(
 )
 
 
-@apps.tool(resource_uri=MARKET_APP_URI, annotations=_READ_ONLY)
+@apps.tool(resource_uri=MARKET_APP_URI, title="Search premium domains for sale", annotations=_READ_ONLY)
 async def search_premium_domains(
     keyword: str = "",
     tld: str = "ai",
@@ -231,7 +231,7 @@ _WHOIS_TIMEOUT = httpx.Timeout(connect=10.0, read=45.0, write=10.0, pool=10.0)
 
 
 
-@mcp.tool(annotations=_READ_ONLY)
+@mcp.tool(title="WHOIS lookup", annotations=_READ_ONLY)
 async def whois_lookup(domain: str) -> dict:
     """Look up WHOIS/RDAP registration details for a domain: registrar,
     registrant, creation/expiration dates, nameservers.
@@ -255,7 +255,7 @@ async def whois_lookup(domain: str) -> dict:
     }
 
 
-@mcp.tool(annotations=_READ_ONLY)
+@mcp.tool(title="TLD registration price", annotations=_READ_ONLY)
 async def tld_registration_price(
     tld: str,
     operation: Literal["register", "transfer", "renew", "restore"] = "register",
@@ -280,7 +280,7 @@ async def tld_registration_price(
     }
 
 
-@mcp.tool(annotations=_READ_ONLY)
+@mcp.tool(title="TLD registration requirements", annotations=_READ_ONLY)
 async def tld_requirements(tld: str) -> dict:
     """Get registration requirements for a TLD: allowed registration period
     range, whether an organization is required, allowed registrant
