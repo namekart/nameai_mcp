@@ -60,7 +60,9 @@ async def search_domain(domain: str, include_alternates: bool = True, ctx: Conte
     Buy-now (aftermarket/marketplace) prices are hidden unless you're
     authenticated (see AUTH.md at name.ai for how to get a token) — an
     unauthenticated call only sees new-registration pricing for a domain
-    that's simply unregistered. Pass a valid OAuth access token as this
+    that's simply unregistered. To get the buy-now price of a name that is
+    for sale without signing in, use search_marketplace with that name as
+    keyword and tld="". Pass a valid OAuth access token as this
     call's Authorization header and it's forwarded automatically.
 
     Args:
@@ -90,9 +92,11 @@ mcp = MCPServer(
         "(search_marketplace), check domain availability (search_domain), look up "
         "WHOIS records (whois_lookup), and get TLD registration pricing "
         "(tld_registration_price) and registry requirements (tld_requirements). "
-        "All tools are read-only and work without authentication. Marketplace "
-        "prices on search_domain are masked for anonymous callers - pass an OAuth "
-        "Bearer token (see https://name.ai/auth.md) to see them. whois_lookup is "
+        "All tools are read-only and work without authentication. search_marketplace "
+        "returns buy-now prices without sign-in; for the price of one for-sale name, "
+        "call it with that name as keyword and tld=\"\". Marketplace prices on "
+        "search_domain are masked for anonymous callers - pass an OAuth Bearer token "
+        "(see https://name.ai/auth.md) to see them there. whois_lookup is "
         "rate limited to 10/day per caller IP; cache TLD pricing/requirements, "
         "they change rarely."
     ),
