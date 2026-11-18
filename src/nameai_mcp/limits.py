@@ -3,6 +3,11 @@
 name.ai gives this whole server one bucket (600 listings calls/min). Without
 a limit here, one anonymous caller could use it up for every Claude user.
 
+Per-session cap only applies to clients that send `mcp-session-id`. Clients on
+the stateless protocol (Claude Code, checked 2026-11-18: headers carry
+`mcp-method`, no session) get the global cap only. Per-IP is no substitute:
+claude.ai calls all come from Anthropic's IPs.
+
 shortcut: in-memory, so limits and cache are per container and reset on
 deploy. Fine for one Coolify container; move to Redis if it ever scales out.
 """

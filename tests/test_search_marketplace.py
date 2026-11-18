@@ -78,7 +78,7 @@ class SearchMarketplaceTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_session_limit_refuses_without_calling_name_ai(self):
         class Ctx:
-            headers = {"mcp-session-id": "abc"}
+            headers = {"Mcp-Session-Id": "abc"}  # mixed case, as Claude sends it
         get_json = AsyncMock(return_value=ITEMS)
         with patch.object(server, "get_json", get_json):
             for i in range(limits.PER_SESSION_PER_MIN):

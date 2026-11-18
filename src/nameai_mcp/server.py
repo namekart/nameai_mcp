@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 from typing import Literal, TypedDict
 
 import httpx
@@ -88,6 +90,7 @@ async def search_domain(domain: str, include_alternates: bool = True, ctx: Conte
     return {"query": domain, "results": rows}
 
 
+_log = logging.getLogger("nameai_mcp.market")
 _MARKET_MAX = 25
 _SITE = API_BASE_URL  # listing links follow the API host, so stage links stay on stage
 
@@ -176,7 +179,11 @@ async def search_marketplace(
     cache_key = json.dumps(params, sort_keys=True)
     data = limits.cache_get(cache_key)
     if data is None:
-        session_id = (ctx.headers or {}).get("mcp-session-id") if ctx else None
+        # Header names may arrive in any case ("Mcp-Session-Id" from Claude).
+        headers = {k.lower(): v for k, v in ((ctx.headers or {}).items() if ctx else [])}
+        session_id = headers.get("mcp-session-id")
+        # Hashed, so logs show how clients reuse sessions without storing the id.
+        _log.info("search_marketplace call session=%s", hashlib.sha256((session_id or "-").encode()).hexdigest()[:8])
         if not limits.allow(session_id):
             raise ToolError("Too many marketplace searches right now. Try again in a minute.")
         try:
