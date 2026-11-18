@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-from typing import Literal
+import json
+from typing import Literal, TypedDict
 
 import httpx
 from mcp.server.apps import Apps, ResourceCsp
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from nameai_mcp.nameai_client import API_BASE_URL, NameAIAPIError, get_json, mcp_key_headers, post_json, post_ndjson_rows
 from nameai_mcp.oauth_verifier import verify_bearer_token
+from nameai_mcp import limits
+from nameai_mcp.market_app_html import MARKET_APP_HTML, MARKET_APP_URI
 from nameai_mcp.search_app_html import SEARCH_APP_HTML, SEARCH_APP_URI
 
 # Deliberately NOT passing auth=AuthSettings(...) here. The lowlevel Server's
@@ -84,6 +88,115 @@ async def search_domain(domain: str, include_alternates: bool = True, ctx: Conte
     return {"query": domain, "results": rows}
 
 
+_MARKET_MAX = 25
+_SITE = API_BASE_URL  # listing links follow the API host, so stage links stay on stage
+
+
+class MarketListing(TypedDict):
+    domain: str
+    price_usd: float | None
+    url: str
+
+
+class MarketResults(TypedDict):
+    query: dict[str, str | int]
+    results: list[MarketListing]
+    total: int | None
+    has_more: bool
+    browse_url: str
+
+
+def _listing_row(item: dict) -> MarketListing:
+    domain = str(item.get("domain") or "")
+    price = (item.get("price") or {}).get("bin")
+    return {
+        # Seller's casing ("QuietHarbor.ai") for display; the URL uses the lowercase name.
+        "domain": item.get("display_name") or domain,
+        "price_usd": price if isinstance(price, (int, float)) else None,
+        "url": f"{_SITE}/{domain}?utm_source=mcp&utm_medium=connector",
+    }
+
+
+apps.add_html_resource(
+    MARKET_APP_URI,
+    MARKET_APP_HTML,
+    name="market-results",
+    title="Premium domains for sale",
+    description="Renders search_marketplace results as a price list linking to name.ai listings.",
+    # The view makes no network calls; links open through the host.
+    csp=ResourceCsp(connect_domains=[], resource_domains=["https://name.ai"], frame_domains=[]),
+    prefers_border=True,
+)
+
+
+@apps.tool(resource_uri=MARKET_APP_URI, annotations=_READ_ONLY)
+async def search_marketplace(
+    keyword: str = "",
+    tld: str = "ai",
+    min_price: int | None = None,
+    max_price: int | None = None,
+    sort: Literal["newest", "price_asc", "price_desc"] = "newest",
+    limit: int = 10,
+    ctx: Context = None,
+) -> MarketResults:
+    """Find premium domain names currently for sale on name.ai, with buy-now
+    prices (USD) and a link to each listing, where the purchase happens.
+
+    Use when the user wants a name for a startup, product or brand, or wants
+    to browse domains to buy, optionally within a budget.
+
+    `keyword` matches text inside the domain name, so pass ONE short word
+    ("legal", "pay", "health"), not a sentence. For a business idea, call
+    this several times with different related words, or leave keyword empty
+    to browse the newest premium names. To check whether one specific domain
+    is free to register, use search_domain instead.
+
+    Backed by GET /api/market/listings (public). Read-only: nothing is bought.
+
+    Args:
+        keyword: One short word the domain name should contain. Empty = browse.
+        tld: TLD without the dot, e.g. "ai" (default) or "com". Empty = any.
+        min_price: Lowest buy-now price in USD.
+        max_price: Highest buy-now price in USD.
+        sort: "newest" (default), "price_asc" or "price_desc".
+        limit: Number of results, 1 to 25 (default 10).
+    """
+    params: dict[str, str | int] = {"limit": max(1, min(_MARKET_MAX, limit))}
+    if keyword.strip():
+        params["q"] = keyword.strip().lower()
+    if tld.strip().lstrip("."):
+        params["tld"] = tld.strip().lstrip(".").lower()
+    if min_price is not None:
+        params["min"] = max(0, min_price)
+    if max_price is not None:
+        params["max"] = max(0, max_price)
+    if sort != "newest":
+        params["sort"] = sort
+
+    cache_key = json.dumps(params, sort_keys=True)
+    data = limits.cache_get(cache_key)
+    if data is None:
+        session_id = (ctx.headers or {}).get("mcp-session-id") if ctx else None
+        if not limits.allow(session_id):
+            raise ToolError("Too many marketplace searches right now. Try again in a minute.")
+        try:
+            data = await get_json("/api/market/listings", params, extra_headers=mcp_key_headers())
+        except NameAIAPIError as err:
+            if err.status_code == 429:
+                raise ToolError("name.ai marketplace search is busy. Try again in a minute.") from err
+            raise ToolError(f"name.ai marketplace search failed: {err}") from err
+        limits.cache_put(cache_key, data)
+    page = data.get("page") or {}
+    results = [_listing_row(i) for i in data.get("items") or [] if i and i.get("domain")]
+    return {
+        "query": {k: v for k, v in params.items() if k != "limit"},
+        "results": results,
+        "total": page.get("total"),
+        "has_more": bool(page.get("has_more")),
+        "browse_url": f"{_SITE}/market",
+    }
+
+
 mcp = MCPServer(
     name="nameai-mcp",
     version="1.0.0",
@@ -131,76 +244,6 @@ async def whois_lookup(domain: str) -> dict:
         "quota_used": data.get("used"),
         "quota_cap": data.get("cap"),
         "quota_remaining": data.get("remaining"),
-    }
-
-
-_MARKET_MAX = 25
-_SITE = API_BASE_URL  # listing links follow the API host, so stage links stay on stage
-
-
-def _listing_row(item: dict) -> dict:
-    domain = str(item.get("domain") or "")
-    price = (item.get("price") or {}).get("bin")
-    return {
-        # Seller's casing ("QuietHarbor.ai") for display; the URL uses the lowercase name.
-        "domain": item.get("display_name") or domain,
-        "price_usd": price if isinstance(price, (int, float)) else None,
-        "url": f"{_SITE}/{domain}?utm_source=mcp&utm_medium=connector",
-    }
-
-
-@mcp.tool(annotations=_READ_ONLY)
-async def search_marketplace(
-    keyword: str = "",
-    tld: str = "ai",
-    min_price: int | None = None,
-    max_price: int | None = None,
-    sort: Literal["newest", "price_asc", "price_desc"] = "newest",
-    limit: int = 10,
-) -> dict:
-    """Find premium domain names currently for sale on name.ai, with buy-now
-    prices (USD) and a link to each listing, where the purchase happens.
-
-    Use when the user wants a name for a startup, product or brand, or wants
-    to browse domains to buy, optionally within a budget.
-
-    `keyword` matches text inside the domain name, so pass ONE short word
-    ("legal", "pay", "health"), not a sentence. For a business idea, call
-    this several times with different related words, or leave keyword empty
-    to browse the newest premium names. To check whether one specific domain
-    is free to register, use search_domain instead.
-
-    Backed by GET /api/market/listings (public). Read-only: nothing is bought.
-
-    Args:
-        keyword: One short word the domain name should contain. Empty = browse.
-        tld: TLD without the dot, e.g. "ai" (default) or "com". Empty = any.
-        min_price: Lowest buy-now price in USD.
-        max_price: Highest buy-now price in USD.
-        sort: "newest" (default), "price_asc" or "price_desc".
-        limit: Number of results, 1 to 25 (default 10).
-    """
-    params: dict[str, str | int] = {"limit": max(1, min(_MARKET_MAX, limit))}
-    if keyword.strip():
-        params["q"] = keyword.strip().lower()
-    if tld.strip().lstrip("."):
-        params["tld"] = tld.strip().lstrip(".").lower()
-    if min_price is not None:
-        params["min"] = max(0, min_price)
-    if max_price is not None:
-        params["max"] = max(0, max_price)
-    if sort != "newest":
-        params["sort"] = sort
-
-    data = await get_json("/api/market/listings", params, extra_headers=mcp_key_headers())
-    page = data.get("page") or {}
-    results = [_listing_row(i) for i in data.get("items") or [] if i and i.get("domain")]
-    return {
-        "query": {k: v for k, v in params.items() if k != "limit"},
-        "results": results,
-        "total": page.get("total"),
-        "has_more": bool(page.get("has_more")),
-        "browse_url": f"{_SITE}/market",
     }
 
 

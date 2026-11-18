@@ -6,7 +6,9 @@ Run: python -m unittest discover -s tests
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from nameai_mcp import server
+from nameai_mcp import limits, server
+from mcp.server.mcpserver.exceptions import ToolError
+
 from nameai_mcp.nameai_client import NameAIAPIError
 
 ITEMS = {
@@ -20,6 +22,9 @@ ITEMS = {
 
 
 class SearchMarketplaceTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        limits.reset()
+
     async def call(self, response=ITEMS, **kwargs):
         with patch.object(server, "get_json", AsyncMock(return_value=response)) as get_json:
             result = await server.search_marketplace(**kwargs)
@@ -52,15 +57,51 @@ class SearchMarketplaceTest(unittest.IsolatedAsyncioTestCase):
             _, get_json = await self.call()
         self.assertEqual(get_json.call_args.kwargs["extra_headers"], {"x-nameai-mcp-key": "k"})
 
-    async def test_api_error_propagates(self):
+    async def test_api_error_becomes_readable_tool_error(self):
         with patch.object(server, "get_json", AsyncMock(side_effect=NameAIAPIError(429, "Rate limit exceeded"))):
-            with self.assertRaises(NameAIAPIError):
+            with self.assertRaisesRegex(ToolError, "busy"):
                 await server.search_marketplace(keyword="pay")
 
-    async def test_tool_is_registered_read_only(self):
+    async def test_tool_is_registered_read_only_with_card_and_schema(self):
         tools = {t.name: t for t in await server.mcp.list_tools()}
-        self.assertIn("search_marketplace", tools)
-        self.assertTrue(tools["search_marketplace"].annotations.read_only_hint)
+        tool = tools["search_marketplace"]
+        self.assertTrue(tool.annotations.read_only_hint)
+        self.assertEqual(tool.meta["ui"]["resourceUri"], "ui://nameai/market-results.html")
+        self.assertIn("results", tool.output_schema["properties"])
+
+    async def test_same_query_is_served_from_cache(self):
+        get_json = AsyncMock(return_value=ITEMS)
+        with patch.object(server, "get_json", get_json):
+            await server.search_marketplace(keyword="pay")
+            await server.search_marketplace(keyword="pay")
+        self.assertEqual(get_json.await_count, 1)
+
+    async def test_session_limit_refuses_without_calling_name_ai(self):
+        class Ctx:
+            headers = {"mcp-session-id": "abc"}
+        get_json = AsyncMock(return_value=ITEMS)
+        with patch.object(server, "get_json", get_json):
+            for i in range(limits.PER_SESSION_PER_MIN):
+                await server.search_marketplace(keyword=f"k{i}", ctx=Ctx())
+            with self.assertRaisesRegex(ToolError, "Too many"):
+                await server.search_marketplace(keyword="one-more", ctx=Ctx())
+        self.assertEqual(get_json.await_count, limits.PER_SESSION_PER_MIN)
+
+
+class LimitsTest(unittest.TestCase):
+    def setUp(self):
+        limits.reset()
+
+    def test_global_cap_and_new_minute(self):
+        for _ in range(limits.GLOBAL_PER_MIN):
+            self.assertTrue(limits.allow(None, now=60.0))
+        self.assertFalse(limits.allow(None, now=60.0))
+        self.assertTrue(limits.allow(None, now=120.0))
+
+    def test_cache_expires(self):
+        limits.cache_put("k", 1, now=0.0)
+        self.assertEqual(limits.cache_get("k", now=10.0), 1)
+        self.assertIsNone(limits.cache_get("k", now=limits.CACHE_TTL_SEC + 1.0))
 
 
 if __name__ == "__main__":

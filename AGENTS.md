@@ -25,12 +25,16 @@ Connect: paste `mcp.json` from this repo into your client config, or
 
 ## Working in this repo (for coding agents)
 
-- Layout: `src/nameai_mcp/server.py` (tools + resources), `app.py` (FastAPI
+- Layout: `src/nameai_mcp/server.py` (tools + resources), `search_app_html.py`
+  and `market_app_html.py` (MCP Apps cards), `app.py` (FastAPI
   mount, transport security, well-known routes), `nameai_client.py` (httpx
   client for name.ai's public REST API), `oauth_verifier.py` (token
   introspection against name.ai).
 - Run locally: `uv sync && uv run uvicorn nameai_mcp.app:app --reload`.
   Tests: `python -m unittest discover -s tests` (stdlib, no extra deps).
+- `search_marketplace` has its own in-memory limit and 5-min cache
+  (`limits.py`: 30/min per MCP session, 300/min for the whole server).
+  name.ai gives this server one 600/min bucket, so keep the global cap under it.
   Smoke-test with a JSON-RPC `initialize` POST to `/mcp` (see README).
 - Every tool must stay read-only and anonymous-safe. Do NOT wire
   `MCPServer(token_verifier=...)` — it gates the entire `/mcp` endpoint;
