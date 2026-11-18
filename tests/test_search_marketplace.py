@@ -1,4 +1,4 @@
-"""search_marketplace: params sent to name.ai, result mapping, limits, errors.
+"""search_premium_domains: params sent to name.ai, result mapping, limits, errors.
 
 Run: python -m unittest discover -s tests
 """
@@ -27,7 +27,7 @@ class SearchMarketplaceTest(unittest.IsolatedAsyncioTestCase):
 
     async def call(self, response=ITEMS, **kwargs):
         with patch.object(server, "get_json", AsyncMock(return_value=response)) as get_json:
-            result = await server.search_marketplace(**kwargs)
+            result = await server.search_premium_domains(**kwargs)
         return result, get_json
 
     async def test_maps_rows_and_page(self):
@@ -60,11 +60,11 @@ class SearchMarketplaceTest(unittest.IsolatedAsyncioTestCase):
     async def test_api_error_becomes_readable_tool_error(self):
         with patch.object(server, "get_json", AsyncMock(side_effect=NameAIAPIError(429, "Rate limit exceeded"))):
             with self.assertRaisesRegex(ToolError, "busy"):
-                await server.search_marketplace(keyword="pay")
+                await server.search_premium_domains(keyword="pay")
 
     async def test_tool_is_registered_read_only_with_card_and_schema(self):
         tools = {t.name: t for t in await server.mcp.list_tools()}
-        tool = tools["search_marketplace"]
+        tool = tools["search_premium_domains"]
         self.assertTrue(tool.annotations.read_only_hint)
         self.assertEqual(tool.meta["ui"]["resourceUri"], "ui://nameai/market-results.html")
         self.assertIn("results", tool.output_schema["properties"])
@@ -72,8 +72,8 @@ class SearchMarketplaceTest(unittest.IsolatedAsyncioTestCase):
     async def test_same_query_is_served_from_cache(self):
         get_json = AsyncMock(return_value=ITEMS)
         with patch.object(server, "get_json", get_json):
-            await server.search_marketplace(keyword="pay")
-            await server.search_marketplace(keyword="pay")
+            await server.search_premium_domains(keyword="pay")
+            await server.search_premium_domains(keyword="pay")
         self.assertEqual(get_json.await_count, 1)
 
     async def test_session_limit_refuses_without_calling_name_ai(self):
@@ -82,9 +82,9 @@ class SearchMarketplaceTest(unittest.IsolatedAsyncioTestCase):
         get_json = AsyncMock(return_value=ITEMS)
         with patch.object(server, "get_json", get_json):
             for i in range(limits.PER_SESSION_PER_MIN):
-                await server.search_marketplace(keyword=f"k{i}", ctx=Ctx())
+                await server.search_premium_domains(keyword=f"k{i}", ctx=Ctx())
             with self.assertRaisesRegex(ToolError, "Too many"):
-                await server.search_marketplace(keyword="one-more", ctx=Ctx())
+                await server.search_premium_domains(keyword="one-more", ctx=Ctx())
         self.assertEqual(get_json.await_count, limits.PER_SESSION_PER_MIN)
 
 

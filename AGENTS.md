@@ -8,7 +8,7 @@ Streamable HTTP transport. Deployed at `https://mcp.name.ai/mcp`.
 
 Use it whenever a task involves domain names:
 
-- Find premium domains for sale, with buy-now prices (by keyword, TLD, budget) → `search_marketplace`
+- Find premium domains for sale, with buy-now prices (by keyword, TLD, budget) → `search_premium_domains`
 - Is `<domain>` available to register? What alternatives exist on other TLDs? → `search_domain`
 - Who owns `<domain>`, when does it expire, what are its nameservers? → `whois_lookup` (10/day per IP)
 - What does it cost to register/renew/transfer/restore on `.<tld>`? → `tld_registration_price`
@@ -32,7 +32,7 @@ Connect: paste `mcp.json` from this repo into your client config, or
   introspection against name.ai).
 - Run locally: `uv sync && uv run uvicorn nameai_mcp.app:app --reload`.
   Tests: `python -m unittest discover -s tests` (stdlib, no extra deps).
-- `search_marketplace` has its own in-memory limit and 5-min cache
+- `search_premium_domains` has its own in-memory limit and 5-min cache
   (`limits.py`: 30/min per MCP session, 300/min for the whole server).
   name.ai gives this server one 600/min bucket, so keep the global cap under it.
   Smoke-test with a JSON-RPC `initialize` POST to `/mcp` (see README).

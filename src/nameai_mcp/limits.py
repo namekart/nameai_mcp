@@ -1,4 +1,4 @@
-"""In-process rate limit and response cache for search_marketplace.
+"""In-process rate limit and response cache for search_premium_domains.
 
 name.ai gives this whole server one bucket (600 listings calls/min). Without
 a limit here, one anonymous caller could use it up for every Claude user.

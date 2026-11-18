@@ -67,7 +67,7 @@ async def search_domain(domain: str, include_alternates: bool = True, ctx: Conte
     authenticated (see AUTH.md at name.ai for how to get a token) — an
     unauthenticated call only sees new-registration pricing for a domain
     that's simply unregistered. To get the buy-now price of a name that is
-    for sale without signing in, use search_marketplace with that name as
+    for sale without signing in, use search_premium_domains with that name as
     keyword and tld="". Pass a valid OAuth access token as this
     call's Authorization header and it's forwarded automatically.
 
@@ -125,7 +125,7 @@ apps.add_html_resource(
     MARKET_APP_HTML,
     name="market-results",
     title="Premium domains for sale",
-    description="Renders search_marketplace results as a price list linking to name.ai listings.",
+    description="Renders search_premium_domains results as a price list linking to name.ai listings.",
     # The view makes no network calls; links open through the host.
     csp=ResourceCsp(connect_domains=[], resource_domains=["https://name.ai"], frame_domains=[]),
     prefers_border=True,
@@ -133,7 +133,7 @@ apps.add_html_resource(
 
 
 @apps.tool(resource_uri=MARKET_APP_URI, annotations=_READ_ONLY)
-async def search_marketplace(
+async def search_premium_domains(
     keyword: str = "",
     tld: str = "ai",
     min_price: int | None = None,
@@ -142,8 +142,9 @@ async def search_marketplace(
     limit: int = 10,
     ctx: Context = None,
 ) -> MarketResults:
-    """Find premium domain names currently for sale on name.ai, with buy-now
-    prices (USD) and a link to each listing, where the purchase happens.
+    """Search premium domain names for sale on name.ai (domain marketplace):
+    find a domain to buy for a startup, product or brand, with buy-now prices
+    (USD) and a link to each listing, where the purchase happens.
 
     Use when the user wants a name for a startup, product or brand, or wants
     to browse domains to buy, optionally within a budget.
@@ -183,7 +184,7 @@ async def search_marketplace(
         headers = {k.lower(): v for k, v in ((ctx.headers or {}).items() if ctx else [])}
         session_id = headers.get("mcp-session-id")
         # Hashed, so logs show how clients reuse sessions without storing the id.
-        _log.info("search_marketplace call session=%s", hashlib.sha256((session_id or "-").encode()).hexdigest()[:8])
+        _log.info("search_premium_domains call session=%s", hashlib.sha256((session_id or "-").encode()).hexdigest()[:8])
         if not limits.allow(session_id):
             raise ToolError("Too many marketplace searches right now. Try again in a minute.")
         try:
@@ -209,10 +210,10 @@ mcp = MCPServer(
     version="1.0.0",
     instructions=(
         "Name.ai domain tools: find premium domains for sale with prices "
-        "(search_marketplace), check domain availability (search_domain), look up "
+        "(search_premium_domains), check domain availability (search_domain), look up "
         "WHOIS records (whois_lookup), and get TLD registration pricing "
         "(tld_registration_price) and registry requirements (tld_requirements). "
-        "All tools are read-only and work without authentication. search_marketplace "
+        "All tools are read-only and work without authentication. search_premium_domains "
         "returns buy-now prices without sign-in; for the price of one for-sale name, "
         "call it with that name as keyword and tld=\"\". Marketplace prices on "
         "search_domain are masked for anonymous callers - pass an OAuth Bearer token "
@@ -309,7 +310,7 @@ def overview_resource() -> str:
     return (
         "# Name.ai MCP server\n\n"
         "Domain tools backed by name.ai:\n\n"
-        "- `search_marketplace` — premium domains for sale on name.ai, with buy-now prices and links.\n"
+        "- `search_premium_domains` — premium domains for sale on name.ai, with buy-now prices and links.\n"
         "- `search_domain` — availability + alternate-TLD suggestions with registration pricing.\n"
         "- `whois_lookup` — WHOIS/RDAP record for a domain (10/day per IP).\n"
         "- `tld_registration_price` — USD price to register/transfer/renew/restore on a TLD.\n"

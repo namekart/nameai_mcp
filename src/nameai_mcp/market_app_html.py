@@ -1,4 +1,4 @@
-"""The MCP Apps view for search_marketplace: a price list of premium domains
+"""The MCP Apps view for search_premium_domains: a price list of premium domains
 for sale, rendered by the host in a sandboxed iframe (ext-apps spec,
 `text/html;profile=mcp-app`). Same wire protocol as search_app_html.py.
 

@@ -24,7 +24,7 @@ Remote Streamable HTTP MCP server, no install and no API key:
 }
 ```
 
-Tools: `search_marketplace`, `search_domain`, `whois_lookup`,
+Tools: `search_premium_domains`, `search_domain`, `whois_lookup`,
 `tld_registration_price`, `tld_requirements`.
 
 ## Alternative: plain REST
