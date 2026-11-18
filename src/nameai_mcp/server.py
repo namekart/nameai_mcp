@@ -7,7 +7,7 @@ from mcp.server.apps import Apps, ResourceCsp
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.types import ToolAnnotations
 
-from nameai_mcp.nameai_client import NameAIAPIError, get_json, post_json, post_ndjson_rows
+from nameai_mcp.nameai_client import API_BASE_URL, NameAIAPIError, get_json, mcp_key_headers, post_json, post_ndjson_rows
 from nameai_mcp.oauth_verifier import verify_bearer_token
 from nameai_mcp.search_app_html import SEARCH_APP_HTML, SEARCH_APP_URI
 
@@ -86,7 +86,8 @@ mcp = MCPServer(
     name="nameai-mcp",
     version="1.0.0",
     instructions=(
-        "Name.ai domain tools: check domain availability (search_domain), look up "
+        "Name.ai domain tools: find premium domains for sale with prices "
+        "(search_marketplace), check domain availability (search_domain), look up "
         "WHOIS records (whois_lookup), and get TLD registration pricing "
         "(tld_registration_price) and registry requirements (tld_requirements). "
         "All tools are read-only and work without authentication. Marketplace "
@@ -126,6 +127,76 @@ async def whois_lookup(domain: str) -> dict:
         "quota_used": data.get("used"),
         "quota_cap": data.get("cap"),
         "quota_remaining": data.get("remaining"),
+    }
+
+
+_MARKET_MAX = 25
+_SITE = API_BASE_URL  # listing links follow the API host, so stage links stay on stage
+
+
+def _listing_row(item: dict) -> dict:
+    domain = str(item.get("domain") or "")
+    price = (item.get("price") or {}).get("bin")
+    return {
+        # Seller's casing ("QuietHarbor.ai") for display; the URL uses the lowercase name.
+        "domain": item.get("display_name") or domain,
+        "price_usd": price if isinstance(price, (int, float)) else None,
+        "url": f"{_SITE}/{domain}?utm_source=mcp&utm_medium=connector",
+    }
+
+
+@mcp.tool(annotations=_READ_ONLY)
+async def search_marketplace(
+    keyword: str = "",
+    tld: str = "ai",
+    min_price: int | None = None,
+    max_price: int | None = None,
+    sort: Literal["newest", "price_asc", "price_desc"] = "newest",
+    limit: int = 10,
+) -> dict:
+    """Find premium domain names currently for sale on name.ai, with buy-now
+    prices (USD) and a link to each listing, where the purchase happens.
+
+    Use when the user wants a name for a startup, product or brand, or wants
+    to browse domains to buy, optionally within a budget.
+
+    `keyword` matches text inside the domain name, so pass ONE short word
+    ("legal", "pay", "health"), not a sentence. For a business idea, call
+    this several times with different related words, or leave keyword empty
+    to browse the newest premium names. To check whether one specific domain
+    is free to register, use search_domain instead.
+
+    Backed by GET /api/market/listings (public). Read-only: nothing is bought.
+
+    Args:
+        keyword: One short word the domain name should contain. Empty = browse.
+        tld: TLD without the dot, e.g. "ai" (default) or "com". Empty = any.
+        min_price: Lowest buy-now price in USD.
+        max_price: Highest buy-now price in USD.
+        sort: "newest" (default), "price_asc" or "price_desc".
+        limit: Number of results, 1 to 25 (default 10).
+    """
+    params: dict[str, str | int] = {"limit": max(1, min(_MARKET_MAX, limit))}
+    if keyword.strip():
+        params["q"] = keyword.strip().lower()
+    if tld.strip().lstrip("."):
+        params["tld"] = tld.strip().lstrip(".").lower()
+    if min_price is not None:
+        params["min"] = max(0, min_price)
+    if max_price is not None:
+        params["max"] = max(0, max_price)
+    if sort != "newest":
+        params["sort"] = sort
+
+    data = await get_json("/api/market/listings", params, extra_headers=mcp_key_headers())
+    page = data.get("page") or {}
+    results = [_listing_row(i) for i in data.get("items") or [] if i and i.get("domain")]
+    return {
+        "query": {k: v for k, v in params.items() if k != "limit"},
+        "results": results,
+        "total": page.get("total"),
+        "has_more": bool(page.get("has_more")),
+        "browse_url": f"{_SITE}/market",
     }
 
 
@@ -184,6 +255,7 @@ def overview_resource() -> str:
     return (
         "# Name.ai MCP server\n\n"
         "Domain tools backed by name.ai:\n\n"
+        "- `search_marketplace` — premium domains for sale on name.ai, with buy-now prices and links.\n"
         "- `search_domain` — availability + alternate-TLD suggestions with registration pricing.\n"
         "- `whois_lookup` — WHOIS/RDAP record for a domain (10/day per IP).\n"
         "- `tld_registration_price` — USD price to register/transfer/renew/restore on a TLD.\n"

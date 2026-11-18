@@ -8,6 +8,7 @@ Streamable HTTP transport. Deployed at `https://mcp.name.ai/mcp`.
 
 Use it whenever a task involves domain names:
 
+- Find premium domains for sale, with buy-now prices (by keyword, TLD, budget) → `search_marketplace`
 - Is `<domain>` available to register? What alternatives exist on other TLDs? → `search_domain`
 - Who owns `<domain>`, when does it expire, what are its nameservers? → `whois_lookup` (10/day per IP)
 - What does it cost to register/renew/transfer/restore on `.<tld>`? → `tld_registration_price`
@@ -29,6 +30,7 @@ Connect: paste `mcp.json` from this repo into your client config, or
   client for name.ai's public REST API), `oauth_verifier.py` (token
   introspection against name.ai).
 - Run locally: `uv sync && uv run uvicorn nameai_mcp.app:app --reload`.
+  Tests: `python -m unittest discover -s tests` (stdlib, no extra deps).
   Smoke-test with a JSON-RPC `initialize` POST to `/mcp` (see README).
 - Every tool must stay read-only and anonymous-safe. Do NOT wire
   `MCPServer(token_verifier=...)` — it gates the entire `/mcp` endpoint;

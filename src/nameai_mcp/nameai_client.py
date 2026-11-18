@@ -22,6 +22,16 @@ API_BASE_URL = os.environ.get("NAMEAI_API_BASE_URL", "https://name.ai").rstrip("
 _TIMEOUT = httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=10.0)
 _HEADERS = {"user-agent": "nameai-mcp/0.1 (+https://name.ai)"}
 
+# Same pre-shared secret oauth_verifier.py uses. name.ai treats a request that
+# carries it as this server: marketplace BIN prices are shown (never the floor)
+# and a separate, higher rate-limit bucket applies.
+_MCP_KEY = os.environ.get("OAUTH_INTROSPECTION_SECRET", "")
+
+
+def mcp_key_headers() -> dict[str, str] | None:
+    """Header that identifies this server to name.ai, or None when unset."""
+    return {"x-nameai-mcp-key": _MCP_KEY} if _MCP_KEY else None
+
 
 class NameAIAPIError(RuntimeError):
     """Raised when the name.ai API returns a non-2xx response."""
