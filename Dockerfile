@@ -15,6 +15,10 @@ RUN uv sync --locked --no-dev
 
 ENV PATH="/app/.venv/bin:${PATH}"
 
+# Run as non-root; the app writes nothing at runtime, so no chown needed.
+RUN useradd --system --uid 10001 --no-create-home app
+USER app
+
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1

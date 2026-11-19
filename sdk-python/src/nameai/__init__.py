@@ -66,6 +66,10 @@ class NameAI:
         access_token: Optional[str] = None,
         timeout: float = 30.0,
     ) -> None:
+        # urlopen also follows file:// and other schemes; only allow real HTTP hosts.
+        parts = urllib.parse.urlsplit(base_url)
+        if parts.scheme not in ("http", "https") or not parts.netloc:
+            raise ValueError(f"base_url must be an http(s) URL, got {base_url!r}")
         self.base_url = base_url.rstrip("/")
         self.access_token = access_token
         self.timeout = timeout

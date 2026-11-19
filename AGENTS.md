@@ -50,3 +50,5 @@ Connect: paste `mcp.json` from this repo into your client config, or
 - Deploys: pushes to `main` are built by Coolify from the Dockerfile.
   The Dockerfile copies README.md because pyproject.toml declares it —
   don't add it to .dockerignore.
+  The image runs as non-root user `app` (uid 10001); the server must not
+  write to disk at runtime.
